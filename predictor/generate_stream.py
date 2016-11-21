@@ -17,7 +17,7 @@ def random_request(t):
     return line
 
 def generate(num = 1):
-    new_file = 'requests/user_requests_r10w1.csv'
+    new_file = '../requests/user_requests_r10w1.csv'
     if (os.path.isfile(new_file)):
         print "Error: '%s' already exists." % new_file
     else:
