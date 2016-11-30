@@ -2,7 +2,7 @@ import getopt, sys
 import urllib2
 
 def pull_prediction(duration):
-    # Pulling Rich Wolski's prediction for us-west-2 m3.medium instance type        
+    # Pulling DrAFTS's prediction for us-west-2 m3.medium instance type        
     url = 'http://128.111.84.183/us-west-2-m3.medium.html'
 
     f = urllib2.urlopen(url)
@@ -18,7 +18,7 @@ def pull_prediction(duration):
         i += 1
     return y[i]
 
-def initial_setup(x, k=1):
+#def initial_setup(x, k=1):
     # Setup master node (balancer)
 
 
@@ -50,5 +50,5 @@ def main():
     print str(pred)
 
 
-if __name__ == '__main__':
-    main()
+#if __name__ == '__main__':
+#    main()
