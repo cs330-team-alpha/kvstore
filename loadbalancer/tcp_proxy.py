@@ -6,7 +6,8 @@ LISTEN_PORT = 8000
 SERVER_PORT = 11211  # Memcached default port
 SERVER_ADDR = "localhost"
 
-BUFFER_BOUNDARY = "#####BUFFERBOUND######"
+INCOMING = '######INCOMING########'
+OUTGOING = "#####OUTGOING######"
 
 
 # Adapted from http://stackoverflow.com/a/15645169/221061
@@ -28,13 +29,15 @@ class ServerProtocol(protocol.Protocol):
             self.client.write(data)
         else:
             self.buffer = data
+        # DEBUG print INCOMING
+        # DEBUG print data
 
     # Proxy => Client
     def write(self, data):
         self.transport.write(data)
         # DEBUG for logging purposes:
-        print BUFFER_BOUNDARY
-        print data
+        # DEBUG print OUTGOING
+        # DEBUG print data
 
 
 class ClientProtocol(protocol.Protocol):

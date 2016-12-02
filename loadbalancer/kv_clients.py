@@ -79,7 +79,7 @@ class MemcachedClient(KVStoreClient):
             returnstring += 'END\r\n'
         elif query.command in MemcachedClient._META_COMMANDS:
             returnstring += 'VERSION 1.4.25 Ubuntu\r\n'
-        print returnstring
+        # DEBUG print returnstring
         return returnstring
 
     def __del__(self):

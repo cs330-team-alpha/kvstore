@@ -22,15 +22,21 @@ add usertable-user2071219101098386137 0 2147483647 1139
 
 class MemcachedQuery(object):
     def __init__(self, fullasciiquery):
+        self.command = None
+        self.key = None
+        self.flags = 0
+        self.exptime = 0
+        self.bytes = 0
         try:  # Store Command
             first_line, second_line = fullasciiquery.splitlines()
-            self.command, self.key, self.flags, self.exptime, self.bytes = first_line.split()
+            self.command, self.key, flag_string, exptime_string, bytes_string = first_line.split()
+            self.flag = int(flag_string)
+            self.exptime = int(exptime_string)
+            self.bytes = int(bytes_string)
             self.data = second_line.strip()
         except:  # Get / Delete Command
             try:
                 self.command, self.key = fullasciiquery.split()
             except:  # Meta Command:
-                self.command = fullasciiquery
-            self.flags = 0
-            self.exptime = 0
-        # TODO: Query subtype parsing if required.
+                self.command = fullasciiquery.strip()
+        # TODO: Query subtype parsing if required
