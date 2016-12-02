@@ -2,35 +2,43 @@ import os
 import sys
 sys.path.insert(0, os.path.abspath('../predictor'))
 
+import collections
 import predict
 import spot
 
-# Core node information stored in LB
-class CoreNode(object):
+class Node(object):
     nodeCount = 0
     def __init__(self, capacity, bid):
-        CoreNode.nodeCount += 1
-        self.capacity = capacity # Assume always full
-        #self.numEntries = 0
-        self.bid = bid
-        self.freq = 0
-
-    def updateFreq(self, freq):
-        self.freq = freq
-
-# Opportunistic node information stored in LB
-class OtherNode(object):
-    nodeCount = 0
-    def __init__(self, capacity, numEntries, bid)
-        OtherNode.nodeCount += 1
+        self.index = Node.nodeCount
+        Node.nodeCount += 1
         self.capacity = capacity
+        self.bid = bid 
+        self.freq = 0 # total workload on the node
+        self.counter = collections.Counter() # counter of read/write request for each key
+        self.hours = 0 # how long has it been active
+
+    def updateFreq(self, reads, writes):
+        # reads/writes = list of keys being read/written (can have duplicates)
+        self.freq += len(reads) + len(writes)
+        r = collections.Counter(reads)
+        w = collections.Counter(writes)
+        self.counter += r + w
+
+# Core node information stored in LB - inherit from Node
+# A = CoreNode(c,b); isinstance(A) == CoreNode
+class CoreNode(Node):
+    def __init__(self, capacity, bid):
+        super().__init__(capacity, bid)
+    
+    def getTopKeys(self, num):
+        return self.counter.most_common(num)
+
+# Opportunistic node information stored in LB - inherit from Node
+class OppNode(Node):
+    def __init__(self, capacity, bid, numEntries):
+        super().__init__(capacity, bid)
         self.numEntries = numEntries
-        self.bid = bid
-        self.freq = 0
-
-    def updateFreq(self, freq):
-        self.freq = freq
-
+    
     def addEntries(self, numAdd):
         self.numEntries += numAdd
         if (self.numEntries > self.capacity):
@@ -39,13 +47,14 @@ class OtherNode(object):
             self.numEntries = self.capacity
         else:
             #TODO: Copy over all
+            self.numEntries = self.numEntries
         return (self.capacity - self.numEntries)
 
 # Naive bidding strategy: mid
 def next_bid_mid(bids, market):
     return (bids[-1] - market) / 2.0
 
-# Distribution of biddings of opportunistic nodes
+# Distribution of biddings of core/opportunistic nodes
 class Bidding(object):
     #counter = 0
     def __init__(self, bidCore):
@@ -77,27 +86,24 @@ def run(numcore=1, duration=3):
     def launch_core(data, bid, num):
         # Dummy operation for now
         capacity = 100
-        for i in xrange(numcore):
-           data.corenodes.append(CoreNore(capacity, bid))
+        for i in xrange(num):
+           data.corenodes.append(CoreNode(capacity, bid))
         return num # return only when all instances have responded
     def launch_new(data, bid):
         # Dummy operation for now
         capacity = 100
         numEntries = 0
-        data.othernodes.append(OtherNode(capacity, numEntries, bid))
+        data.oppnodes.append(OppNode(capacity, bid, numEntries))
         return 1 # return 1 when success, otherwise 0
     
     def init(data):
-        data.corenodes = [ ]
-        data.othernodes = [ ]
+        data.corenodes = [ ] # change to dict? map index to node
+        data.oppnodes = [ ]
         market = spot.get_current_spot_price() #assume it returns price
         bid = predict.pull_prediction(data.duration)
-        success = lauch_core(bid, data.numcore)
+        success = launch_core(data, bid, data.numcore)
         if (success < data.numcore):
             print ("Error: Only %d instances intialized. %d requested." % (success, data.numcore))
-
-
-
 
     class Struct(object): pass
     data = Struct()
@@ -105,7 +111,11 @@ def run(numcore=1, duration=3):
     data.duration = duration
     init(data)
     # Main function begins
-
+    print "Init success!"
+    launch_core(data, 2.0, 3)
+    print "Core success!"
+    launch_new(data, 1.9)
+    print "Opp success!"
     # Main function ends
 
 #run(3, 3)
