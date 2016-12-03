@@ -33,8 +33,15 @@ class Node(object):
     def getHotKeys(self, num):
         return self.counter.most_common(num)
 
+    def getHotKV(self, num):
+        return [(k, kv_client.get(k)) for k in self.getHotKeys(num)]
+
     def getColdKeys(self, num):
         return self.counter.most_common()[:-n-1:-1] 
+
+    def getColdKV(self, num):
+        return [(k, kv_client.get(k)) for k in self.getColdKeys(num)]
+
 
 
 
@@ -48,7 +55,7 @@ class CoreNode(Node):
         #  indicate its locations if duplicated, so that
         #  we dont need to search for it in all opp nodes
         self.dupLocations = dict() # key -> (rr_counter, [dups_in_opp])
-
+        # rr_counter = 0 for core, so dups[rr_counter - 1] for opp nodes 
         
     def dupRemoved(self, oppidx, keys):
         for k in keys:
@@ -56,7 +63,10 @@ class CoreNode(Node):
                 (c, dups) = self.dupLocations[k]
                 if oppidx in dups:
                     dups.remove(oppidx)
-                    self.dupLocations[k] = (c, dups)
+                    if len(dups) > 0:
+                        self.dupLocations[k] = (c, dups)
+                    else:
+                        del self.dupLocations[k]
             else:
                 print "Error: key was not duplicated."
 
@@ -77,21 +87,73 @@ class OppNode(Node):
     def __init__(self, capacity, addr, port, bid):
         super().__init__(capacity, addr, port)
         self.bid = bid
-        self.numEntries = 0
+        self.numEntries = 0 # for computing spare space we have in the opp node
 
-    def addEntries(self, numAdd):
+    # Assuming new entries will fit this opp node
+    # new = [(k1, v1), ...]
+    def addEntries(self, new):
+        numAdd = len(new)
         self.numEntries += numAdd
-        if (self.numEntries > self.capacity):
-            print "Error: Exceeding capacity."
-            #TODO: Copy over some
-            self.numEntries = self.capacity
-        else:
-            #TODO: Copy over all
-            self.numEntries = self.numEntries
-        return (self.capacity - self.numEntries)
+        for (k,v) in new:
+            kv_client.insert(k,v)
+        
+        # Update the dupLocations in cores
+        partitions = dict()
+        for (k, _) in new:
+            dest_id = self.cmemcache_hash(k)
+            if dest_id in partitions:
+                partitions[dest_id] = partitions[dest_id].append(k)
+            else:
+                partitions[dest_id] = [k]   
+        for core_id in partitions:
+            self.pool[core_id].dupAdded(self.index, partitions[core_id])  
+            
+        return numAdd
     
+    # for write-invalidation
+    def invalidateEntries(self, old):
+        numInv = len(old)
+        self.numEntries -= numInv
+        for k in old:
+            self.counter[k] = 0 # set invlaid entry as (dead) cold
+        
+        # Update the dupLocations in cores
+        partitions = dict()
+        for (k, _) in new:
+            dest_id = self.cmemcache_hash(k)
+            if dest_id in partitions:
+                partitions[dest_id] = partitions[dest_id].append(k)
+            else:
+                partitions[dest_id] = [k]   
+        for core_id in partitions:
+            self.pool[core_id].dupRemoved(self.index, partitions[core_id])  
+            
+        return numInv
+
+
+    # old = [k1, k2, ...]
+    def removeEntries(self, old):
+        numDel = len(old)
+        self.numEntries -= numDel
+        for k in old:
+            kv_client.delete(k)
+        
+        # Update the dupLocations in cores
+        partitions = dict()
+        for (k, _) in new:
+            dest_id = self.cmemcache_hash(k)
+            if dest_id in partitions:
+                partitions[dest_id] = partitions[dest_id].append(k)
+            else:
+                partitions[dest_id] = [k]   
+        for core_id in partitions:
+            self.pool[core_id].dupRemoved(self.index, partitions[core_id])  
+            
+        return numDel
+
     def replaceEntries(self, old, new):
-        return 42
+        self.removeEntries(old)
+        self.addEntries(new)
 
 # Naive bidding strategy: mid
 def next_bid_mid(bids, market):
@@ -133,7 +195,9 @@ class LoadBalancer(object):
             port = 11211
             # Assume at this point this spot instance has been fulfilled
             # Then store spot info into LB node pool
-            self.pool.append(CoreNode(CAPACITY, addr, port))
+            new_node = CoreNode(CAPACITY, addr, port)
+            idx = new_node.index
+            self.pool.update({idx: new_node})
         return self.numcore
         #return number of cores launched?
     
@@ -144,8 +208,10 @@ class LoadBalancer(object):
         port = 11211
         # Assume at this point this spot instance has been fulfilled
         # Then store spot info into LB node pool
-        self.pool.append(OppNode(CAPACITY, addr, port, bid))
-        return 1 # return 1 when success, otherwise 0
+        new_node = OppNode(CAPACITY, addr, port, bid)
+        idx = new_node.index
+        self.pool.update({idx: new_node})
+        return idx # return the index of new opp node
     
     def terminate_opp(self, index):
         del self.pool[index]
@@ -156,8 +222,21 @@ class LoadBalancer(object):
         return ((((binascii.crc32(key) & 0xffffffff) >> 16) & 0x7fff) or 1) % self.numcore
 
     def get_node_id(self, key):
-        #TODO:If duplicated in opp, use Round-Robin hash to select memcache node
-        return self.cmemcache_hash(key)
+        core_id = self.cmemcache_hash(key)
+        if self.rebalance_lock:
+            return core_id
+        else: 
+            #Round-Robin
+            if key not in self.dupLocations:
+                return core_id
+            else:
+                (rr_counter, dups) = self.dupLocations[key]
+                total_copies = 1 + len(dups) # 1 for core
+                rr_counter = (rr_counter + 1) % total_copies
+                if rr_counter == 0:
+                    return core_id
+                else:
+                    return dups[rr_counter - 1]
 
     def get_memcached_client(self, index):
         return self.pool[index].memcache
@@ -166,6 +245,7 @@ class LoadBalancer(object):
     # Use trigger ot allow Proxy initiate re-distribution of duplicates
     # Returns the opp node id we are rebalancing, or -1 if no opp node 
     def rebalance(self, hot_core_node_id):
+        self.rebalance_lock = True
         cold_opp_id = -1
         for (idx in xrange(len(self.pool))):
             node = self.pool[idx]
@@ -177,11 +257,12 @@ class LoadBalancer(object):
         if cold_opp_id >= 0:
             hot_core = self.pool[hot_core_node_id]
             
-            num_elem = len(node.counter.elements())
+            num_elem = len(hot_core.counter.elements())
+            hotKV = hot_core.getHotKV(num_elem / 10) # Note 10% of non-zero elem
             hot = hot_core.getHotKeys(num_elem / 10) # Note 10% of non-zero elem
             cold = cold_opp.getColdKeys(num_elem / 10)
         
-            cold_opp.replaceEntries(cold,hot)
+            cold_opp.replaceEntries(cold,hotKV)
             partitions = dict()
             for k in cold:
                 dest_id = self.cmemcache_hash(k)
@@ -193,13 +274,36 @@ class LoadBalancer(object):
                 self.pool[core_id].dupRemoved(cold_opp_id, partitions[core_id])  
             
             hot_core.dupAdded(cold_opp_id, hot)
-
+        self.rebalance_lock = False
         return cold_opp_id
     
     # Use trigger or allow Proxy initiate launch/terminate opp nodes
-    def rescale(self):
-        return 42
-    
+    def rescale(self, hot_core_node_id):
+        # See rebalancing can fix the problem already 
+        rebalanced_opp = self.rebalance(self, hot_core_node_id)
+        if rebalanced_opp == -1:
+            # rebalance was not successful
+            hot_core = self.pool[hot_core_node_id]
+            num_elem = len(hot_core.counter.elements())
+            hotKV = hot_core.getHotKV(num_elem / 10) # Note 10% of non-zero elem
+            hot = hot_core.getHotKeys(num_elem / 10)
+            last_id = max(self.pool.keys())
+            last_opp = self.pool[last_id]
+            capacity = last_opp.capacity
+            numEntries = last_opp.numEntries
+            if ((capacity - numEntries) >= len(hot)):
+                last_opp.addEntries(hotKV)
+            else:
+                last_opp.addEntries(hotKV[:(capacity - numEntries)])
+                if (len(self.bids) != 0):
+                    new_id = self.launch_opp (self.bids [0]) # launch the expensive bid
+                    del self.bids[0]
+                    new_opp = self.pool[new_id]
+                    new_opp.addEntries(hotKV[(capacity - numEntries):-1])
+                    hot_core.dupAdded(new_opp.index, hot)
+                else: 
+                    print "Error: cannot launch new nodes."
+ 
 
     def __init__(self, numcore, duration):
         #data.corenodes = [ ] # change to dict? map index to node
@@ -208,11 +312,15 @@ class LoadBalancer(object):
         self.duration = duration
         self.low_thr = LOW_THRESHOLD
         self.high_thr = HIGH_THRESHOLD
+        self.rebalance_lock = False
 
         # Bidding for core node
         self.bidcore = predict.pull_prediction(self.duration)
         
-        self.pool = [ ] # list of nodes
+        #TODO: create bids
+        self.bids = [] # available bids (decreasing order)
+
+        self.pool = dict() # dictionary of nodes
         # Start with a series of core nodes
         num_launched = self.launch_all_cores()
         
