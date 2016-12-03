@@ -1,7 +1,8 @@
 import boto3
 import csv
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
+from operator import itemgetter
 import subprocess
 
 # TODO: Cleanup
@@ -14,9 +15,9 @@ LOG_PREFIX = 'results/' + datetime.now().strftime('%Y%m%d_%H%M%S')
 
 DEFAULT_MEMCACHED_PORT = 11211
 
+TIMING_GRANULARITY = 5  # Minutes
 
-### For Local Testing
-
+# For Local Testing
 LOCAL_PORTS = [
     12000,
     12001,
@@ -150,4 +151,31 @@ def launch_spot_node(bid_price):
 
     # Reload the instance attributes
     instance.load()
+
+    # TODO: Ping and verify running memcached instance
+    time.sleep(10)
+
     return instance.public_dns_name, DEFAULT_MEMCACHED_PORT
+
+
+def get_node_load(cwclient, instance_id):
+    # Eg: cwclient = boto3.client('cloudwatch')
+    now = datetime.utcnow()
+    past = now - timedelta(minutes=TIMING_GRANULARITY)
+    future = now + timedelta(minutes=TIMING_GRANULARITY)
+
+    results = cwclient.get_metric_statistics(
+        Namespace='AWS/EC2',
+        MetricName='CPUUtilization',
+        Dimensions=[{'Name': 'InstanceId', 'Value': instance_id}],
+        StartTime=past,
+        EndTime=future,
+        Period=300,  # TODO: Verify timing period
+        Statistics=['Average'])
+
+    datapoints = results['Datapoints']
+    last_datapoint = sorted(datapoints, key=itemgetter('Timestamp'))[-1]
+    utilization = last_datapoint['Average']
+    load = round((utilization / 100.0), 2)
+
+    return load
