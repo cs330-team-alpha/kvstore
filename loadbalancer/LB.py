@@ -5,14 +5,17 @@ sys.path.insert(0, os.path.abspath('../predictor'))
 import collections
 import predict
 import spot
+from kv_clients import MemcachedClient
+
+CAPACITY = 100 #max number of entries each node can store
 
 class Node(object):
     nodeCount = 0
-    def __init__(self, capacity, bid):
+    def __init__(self, capacity, addr, port):
         self.index = Node.nodeCount
         Node.nodeCount += 1
         self.capacity = capacity
-        self.bid = bid 
+        self.memcache = MemcachedClient(addr, port)
         self.freq = 0 # total workload on the node
         self.counter = collections.Counter() # counter of read/write request for each key
         self.hours = 0 # how long has it been active
@@ -24,21 +27,27 @@ class Node(object):
         w = collections.Counter(writes)
         self.counter += r + w
 
-# Core node information stored in LB - inherit from Node
-# A = CoreNode(c,b); isinstance(A) == CoreNode
+# Core node information stored in LB - inherits from Node
+# Note: A = CoreNode(...); isinstance(A) == CoreNode
 class CoreNode(Node):
-    def __init__(self, capacity, bid):
-        super().__init__(capacity, bid)
-    
+    def __init__(self, capacity, addr, port):
+        super().__init__(capacity, addr, port)
+        # dont need to store bid, b/c all core has same bidcore
+        # TODO: for each k-v entry in core nodes,
+        #  indicate its locations if duplicated, so that
+        #  we dont need to search for it in all opp nodes
+
     def getTopKeys(self, num):
         return self.counter.most_common(num)
 
-# Opportunistic node information stored in LB - inherit from Node
+# Opportunistic node information stored in LB - inherits from Node
+# Note: B = OppNode(...); isinstance(B) == OppNode
 class OppNode(Node):
-    def __init__(self, capacity, bid, numEntries):
-        super().__init__(capacity, bid)
-        self.numEntries = numEntries
-    
+    def __init__(self, capacity, addr, port, bid):
+        super().__init__(capacity, addr, port)
+        self.bid = bid
+        self.numEntries = 0
+
     def addEntries(self, numAdd):
         self.numEntries += numAdd
         if (self.numEntries > self.capacity):
@@ -68,7 +77,7 @@ class Bidding(object):
         # get next bidding
         #Bidding.counter += 1
         # Assume spot.get_..._price returns price in float
-        new_bid = next_bid(self.bids, spot.get_current_spot_price())
+        new_bid = next_bid_mid(self.bids, spot.get_current_spot_price())
         self.bids.append(new_bid)
         return new_bid
     
@@ -82,40 +91,64 @@ class Bidding(object):
         return old_bid
 
 
-def run(numcore=1, duration=3):
-    def launch_core(data, bid, num):
-        # Dummy operation for now
-        capacity = 100
-        for i in xrange(num):
-           data.corenodes.append(CoreNode(capacity, bid))
-        return num # return only when all instances have responded
-    def launch_new(data, bid):
-        # Dummy operation for now
-        capacity = 100
-        numEntries = 0
-        data.oppnodes.append(OppNode(capacity, bid, numEntries))
+class LoadBalancer(object):
+    def launch_all_cores(self):
+        # Still dummy operation for now
+        for i in xrange(self.numcore):
+            # Contact spot with self.bidcore and get address and port
+            addr = 'localhost'
+            port = 11211
+            # Assume at this point this spot instance has been fulfilled
+            # Then store spot info into LB node pool
+            self.pool.append(CoreNode(CAPACITY, addr, port))
+        return self.numcore
+        #return number of cores launched?
+    
+    def launch_opp(self, bid):
+        # Still dummy operation for now
+        # Contact spot with bid and get address and port
+        addr = 'localhost'
+        port = 11211
+        # Assume at this point this spot instance has been fulfilled
+        # Then store spot info into LB node pool
+        self.pool.append(OppNode(CAPACITY, addr, port, bid))
         return 1 # return 1 when success, otherwise 0
     
-    def init(data):
-        data.corenodes = [ ] # change to dict? map index to node
-        data.oppnodes = [ ]
-        market = spot.get_current_spot_price() #assume it returns price
-        bid = predict.pull_prediction(data.duration)
-        success = launch_core(data, bid, data.numcore)
-        if (success < data.numcore):
-            print ("Error: Only %d instances intialized. %d requested." % (success, data.numcore))
+    def terminate_opp(self, index):
+        del self.pool[index]
+        return index
+    
+    def cmemcache_hash(self, key):
+        # Use memcache-style hash to locate key in core nodes
+        return ((((binascii.crc32(key) & 0xffffffff) >> 16) & 0x7fff) or 1)
 
-    class Struct(object): pass
-    data = Struct()
-    data.numcore = numcore
-    data.duration = duration
-    init(data)
-    # Main function begins
-    print "Init success!"
-    launch_core(data, 2.0, 3)
-    print "Core success!"
-    launch_new(data, 1.9)
-    print "Opp success!"
-    # Main function ends
+    def get_node_id(self, key):
+        #TODO:If duplicated in opp, use Round-Robin hash to select memcache node
+        return self.cmemcache_hash(key)
 
-#run(3, 3)
+    def get_memcached_client(self, index):
+        return self.pool[index].memcache
+        
+    # Use trigger ot allow Proxy initiate re-distribution of duplicates
+    def rebalance(self):
+        return 42
+
+    # Use trigger or allow Proxy initiate launch/terminate opp nodes
+    def rescale(self):
+        return 42
+
+
+    def __init__(self, numcore, duration):
+        #data.corenodes = [ ] # change to dict? map index to node
+        #data.oppnodes = [ ]
+        self.numcore = numcore
+        self.duration = duration
+
+        # Bidding for core node
+        self.bidcore = predict.pull_prediction(self.duration)
+        
+        self.pool = [ ] # list of nodes
+        # Start with a series of core nodes
+        num_launched = self.launch_all_cores()
+        
+       
