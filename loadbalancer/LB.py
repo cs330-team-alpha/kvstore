@@ -51,8 +51,8 @@ class Node(object):
 # Note: A = CoreNode(...); isinstance(A) == CoreNode
 class CoreNode(Node):
 
-    def __init__(self, capacity, addr, port):
-        super(CoreNode, self).__init__(capacity, addr, port)
+    def __init__(self, addr, port):
+        super(CoreNode, self).__init__(addr, port)
         # dont need to store bid, b/c all core has same bidcore
         # For each k-v entry in core nodes,
         #  indicate its locations if duplicated, so that
@@ -229,7 +229,7 @@ class LoadBalancer(object):
 
             # END SUHAIL LOCAL LAUNCH TESTING
 
-            new_node = CoreNode(CAPACITY, addr, port)
+            new_node = CoreNode(addr, port)
             idx = new_node.index
             self.pool.update({idx: new_node})
         return self.numcore
