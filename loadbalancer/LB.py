@@ -7,17 +7,17 @@ import predict
 import spot
 from kv_clients import MemcachedClient
 
-CAPACITY = 100 #max number of entries each node can store
+CAPACITY = 100 #max number of entries each opp node can store
 LOW_THRESHOLD = 20
 HIGH_THRESHOLD = 80
 
 
 class Node(object):
     nodeCount = 0
-    def __init__(self, capacity, addr, port):
+    def __init__(self, addr, port):
         self.index = Node.nodeCount
         Node.nodeCount += 1
-        self.capacity = capacity
+        #self.capacity = capacity
         self.memcache = MemcachedClient(addr, port)
         self.freq = 0 # total workload on the node
         self.counter = collections.Counter() # counter of read/write request for each key
@@ -48,8 +48,8 @@ class Node(object):
 # Core node information stored in LB - inherits from Node
 # Note: A = CoreNode(...); isinstance(A) == CoreNode
 class CoreNode(Node):
-    def __init__(self, capacity, addr, port):
-        super().__init__(capacity, addr, port)
+    def __init__(self, addr, port):
+        super().__init__(addr, port)
         # dont need to store bid, b/c all core has same bidcore
         # TODO: for each k-v entry in core nodes,
         #  indicate its locations if duplicated, so that
@@ -85,8 +85,9 @@ class CoreNode(Node):
 # Note: B = OppNode(...); isinstance(B) == OppNode
 class OppNode(Node):
     def __init__(self, capacity, addr, port, bid):
-        super().__init__(capacity, addr, port)
+        super().__init__(addr, port)
         self.bid = bid
+        self.capacity = capacity
         self.numEntries = 0 # for computing spare space we have in the opp node
 
     # Assuming new entries will fit this opp node
@@ -159,6 +160,9 @@ class OppNode(Node):
 def next_bid_mid(bids, market):
     return (bids[-1] - market) / 2.0
 
+def max_nodes_bid():
+
+
 # Distribution of biddings of core/opportunistic nodes
 class Bidding(object):
     #counter = 0
@@ -177,14 +181,6 @@ class Bidding(object):
         self.bids.append(new_bid)
         return new_bid
     
-    def del_low(self):
-        old_bid = self.bids.pop()
-        return old_bid
-
-    def del_any(self, index):
-        #TODO: Check valid
-        old_bid = self.bids.pop(index)
-        return old_bid
 
 class LoadBalancer(object):
     def launch_all_cores(self):
@@ -195,7 +191,7 @@ class LoadBalancer(object):
             port = 11211
             # Assume at this point this spot instance has been fulfilled
             # Then store spot info into LB node pool
-            new_node = CoreNode(CAPACITY, addr, port)
+            new_node = CoreNode(addr, port)
             idx = new_node.index
             self.pool.update({idx: new_node})
         return self.numcore
@@ -305,11 +301,12 @@ class LoadBalancer(object):
                     print "Error: cannot launch new nodes."
  
 
-    def __init__(self, numcore, duration):
+    def __init__(self, numcore, duration, budget = 0):
         #data.corenodes = [ ] # change to dict? map index to node
         #data.oppnodes = [ ]
         self.numcore = numcore
         self.duration = duration
+        self.budget = budget
         self.low_thr = LOW_THRESHOLD
         self.high_thr = HIGH_THRESHOLD
         self.rebalance_lock = False

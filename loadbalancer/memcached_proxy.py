@@ -12,6 +12,7 @@ SERVER_ADDR = "localhost"
 
 NUM_CORE = 1
 DURATION = 3
+BUDGET = 10.0 # Dollars per hour
 
 # Easiest to keep this as a global variable.
 # kv_pool = []
@@ -22,7 +23,7 @@ class ServerProtocol(protocol.Protocol):
         self.buffer = None
         self.client = None
         #self.kv_pool = []
-        self.load_balancer = LB.LoadBalancer(NUM_CORE, DURATION)
+        self.load_balancer = LB.LoadBalancer(NUM_CORE, DURATION, BUDGET)
 
     def connectionMade(self):
         print "Incoming Connection..."
