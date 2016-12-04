@@ -8,7 +8,7 @@ import unittest
 class LocalKVTestSuite(unittest.TestCase):
     def setUp(self):
         self.memcache = loadbalancer.kv_clients.MemcachedClient(
-            'localhost', '8000')
+            'localhost', '12000')
 
     # def tearDown(self):
     #    self.memcache.delete('1')

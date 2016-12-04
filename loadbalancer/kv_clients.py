@@ -60,6 +60,8 @@ class MemcachedClient(KVStoreClient):
     def process_memcached_query(self, query):
         ''' expects query.MemacachedQuery type with all fields parsed
         '''
+        ### DEBUG
+        print 'FORWARDING query to ' + self.address + " : " + str(self.port)
         returnstring = ''
         if not query.exptime:
             query.exptime = 0

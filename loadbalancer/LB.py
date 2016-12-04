@@ -7,6 +7,7 @@ import predict
 import spot
 from kv_clients import MemcachedClient
 import binascii
+import spot_instance
 
 CAPACITY = 100  # max number of entries each node can store
 LOW_THRESHOLD = 20
@@ -50,7 +51,7 @@ class Node(object):
 # Note: A = CoreNode(...); isinstance(A) == CoreNode
 class CoreNode(Node):
     def __init__(self, capacity, addr, port):
-        super().__init__(capacity, addr, port)
+        super(CoreNode, self).__init__(capacity, addr, port)
         # dont need to store bid, b/c all core has same bidcore
         # TODO: for each k-v entry in core nodes,
         #  indicate its locations if duplicated, so that
@@ -195,12 +196,20 @@ class Bidding(object):
 class LoadBalancer(object):
     def launch_all_cores(self):
         # Still dummy operation for now
+        print "Launching Core Nodes"
         for i in xrange(self.numcore):
+            # SUHAIL LOCAL LAUNCH TESTING
+
             # Contact spot with self.bidcore and get address and port
-            addr = 'localhost'
-            port = 11211
+            # addr = 'localhost'
+            # port = 11211
             # Assume at this point this spot instance has been fulfilled
             # Then store spot info into LB node pool
+
+            addr, port = spot_instance.launch_local_node(i)
+
+            # END SUHAIL LOCAL LAUNCH TESTING
+
             new_node = CoreNode(CAPACITY, addr, port)
             idx = new_node.index
             self.pool.update({idx: new_node})
@@ -208,12 +217,19 @@ class LoadBalancer(object):
         # return number of cores launched?
 
     def launch_opp(self, bid):
+        # SUHAIL LOCAL LAUNCH TESTING
+
         # Still dummy operation for now
         # Contact spot with bid and get address and port
-        addr = 'localhost'
-        port = 11211
+        # addr = 'localhost'
+        # port = 11211
         # Assume at this point this spot instance has been fulfilled
         # Then store spot info into LB node pool
+
+        addr, port = spot_instance.launch_local_node(max(self.pool.keys()) + 1)
+
+        # END SUHAIL LOCAL LAUNCH TESTING
+
         new_node = OppNode(CAPACITY, addr, port, bid)
         idx = new_node.index
         self.pool.update({idx: new_node})
@@ -233,10 +249,10 @@ class LoadBalancer(object):
             return core_id
         else:
             # Round-Robin
-            if key not in self.dupLocations:
+            if key not in self.pool[core_id].dupLocations:
                 return core_id
             else:
-                (rr_counter, dups) = self.dupLocations[key]
+                (rr_counter, dups) = self.pool[core_id].dupLocations[key]
                 total_copies = 1 + len(dups)  # 1 for core
                 rr_counter = (rr_counter + 1) % total_copies
                 if rr_counter == 0:

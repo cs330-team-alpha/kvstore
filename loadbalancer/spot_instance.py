@@ -21,15 +21,7 @@ DEFAULT_MEMCACHED_PORT = 11211
 TIMING_GRANULARITY = 5  # Minutes
 
 # For Local Testing
-LOCAL_PORTS = [
-    12000,
-    12001,
-    12002,
-    12003,
-    12004,
-    12005,
-]
-
+LOCAL_PORTS = 12000
 LOCAL_PIDS = {}
 
 
@@ -37,11 +29,14 @@ def launch_local_node(node_id):
     ''' Launch a local memcached node from a list of ports
         # /usr/bin/memcached -m 64 -p 11211 -u memcache -l 127.0.0.1
     '''
-    port_string = str(LOCAL_PORTS[node_id])
-    process = subprocess.Popen(["memcached", "-m 64",
-                                "-l 127.0.0.1", "-p ", port_string])
+
+    memcached = "memcached -m 64 -u memcache -l %s -p %d"
+    port = LOCAL_PORTS + node_id
+    process = subprocess.Popen(memcached % ('localhost', port), shell=True)
     LOCAL_PIDS[node_id] = process.pid  # Store PID for killing in future
-    return 'localhost', port_string
+    print "Launched local node at port " + str(port)
+    print LOCAL_PIDS
+    return 'localhost', str(port)
 
 
 def kill_local_node(node_id):
