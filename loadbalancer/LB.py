@@ -163,8 +163,29 @@ class OppNode(Node):
 def next_bid_mid(bids, market):
     return ((bids[-1] - market) / 2.0) + market
 
-def max_nodes_bid():
-
+def max_nodes_bid(bidcore, market, budget):
+    # budget is for opp only
+    i = 0
+    while True:
+        i += 1
+        sum_bids = 0
+        step = (bidcore - market) / i
+        j = 1
+        while j <= i:
+            sum_bids += bidcore - j * step
+            j += 1
+        if sum_bids > budget:
+            bids = [ ]
+            if i == 2:
+                bids = [budget]
+            elif i > 2:
+                step = (bidcore - market) / (i-1)
+                # make a list
+                j = 1
+                while j < i - 1:
+                    bids.append(bidcore - j * step)
+                    j += 1
+            return bids
 
 # Distribution of biddings of core/opportunistic nodes
 
@@ -308,22 +329,28 @@ class LoadBalancer(object):
                 else:
                     print "Error: cannot launch new nodes."
 
-    def __init__(self, numcore, duration, budget = 0):
+    def __init__(self, numcore, duration, budget = 0.0):
         #data.corenodes = [ ] # change to dict? map index to node
         #data.oppnodes = [ ]
         self.numcore = numcore
         self.duration = duration
-        self.budget = budget
+        self.budget = float(budget)
         self.low_thr = LOW_THRESHOLD
         self.high_thr = HIGH_THRESHOLD
         self.rebalance_lock = False
 
         # Bidding for core node
-        self.bidcore = predict.pull_prediction(self.duration)
+        self.bidcore = predict.pull_prediction(self.duration) # float
+        
+        if (self.numcore * self.bidcore > self.budget):
+            print "Error: not enough budget."
+            return -1
 
-        # TODO: create bids
-        self.bids = []  # available bids (decreasing order)
-
+        # available bids (decreasing order)
+        market =  spot.get_current_spot_price() # float
+        opp_budget = self.budget - self.numcore * self.bidcore
+        self.bids = max_nodes_bid(self.bidcore, market, opp_budget)
+ 
         self.pool = dict()  # dictionary of nodes
         # Start with a series of core nodes
         num_launched = self.launch_all_cores()

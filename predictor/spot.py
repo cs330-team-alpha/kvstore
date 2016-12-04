@@ -12,7 +12,7 @@ def get_current_spot_price():
         InstanceTypes = ['m3.medium',],
         ProductDescriptions = ['Linux/UNIX (Amazon VPC)',],
         AvailabilityZone = 'us-west-2a')
-    return response #TODO: extract price
+    return response['SpotPrice'] #TODO: extract price
 
 
 #print get_current_spot_price()
