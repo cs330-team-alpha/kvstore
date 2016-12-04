@@ -4,6 +4,9 @@ import time
 from datetime import datetime, timedelta
 from operator import itemgetter
 import subprocess
+import psutil
+
+PROCNAME = "python.exe"
 
 # TODO: Cleanup
 
@@ -27,15 +30,25 @@ LOCAL_PORTS = [
     12005,
 ]
 
+LOCAL_PIDS = {}
+
 
 def launch_local_node(node_id):
     ''' Launch a local memcached node from a list of ports
         # /usr/bin/memcached -m 64 -p 11211 -u memcache -l 127.0.0.1
     '''
     port_string = str(LOCAL_PORTS[node_id])
-    subprocess.Popen(["memcached", "-m 64", "-u memcache",
-                      "-l 127.0.0.1", "-p ", port_string])
+    process = subprocess.Popen(["memcached", "-m 64",
+                                "-l 127.0.0.1", "-p ", port_string])
+    LOCAL_PIDS[node_id] = process.pid  # Store PID for killing in future
     return 'localhost', port_string
+
+
+def kill_local_node(node_id):
+    ''' Kill local memcached process by PID'''
+    p = psutil.Process(LOCAL_PIDS[node_id])
+    p.terminate()
+    del LOCAL_PIDS[node_id]
 
 
 def launch_spot_instance_request(ec2client, launch_config, debug=False):
@@ -156,6 +169,12 @@ def launch_spot_node(bid_price):
     time.sleep(10)
 
     return instance.public_dns_name, DEFAULT_MEMCACHED_PORT
+
+
+def kill_spot_node(addr):
+    # TODO Implement  function by killing instance
+    # and spot request through nodeid
+    pass
 
 
 def get_node_load(cwclient, instance_id):
