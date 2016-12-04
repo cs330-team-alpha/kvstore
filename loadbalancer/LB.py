@@ -54,7 +54,7 @@ class CoreNode(Node):
     def __init__(self, capacity, addr, port):
         super(CoreNode, self).__init__(capacity, addr, port)
         # dont need to store bid, b/c all core has same bidcore
-        # TODO: for each k-v entry in core nodes,
+        # For each k-v entry in core nodes,
         #  indicate its locations if duplicated, so that
         #  we dont need to search for it in all opp nodes
         self.dupLocations = dict()  # key -> (rr_counter, [dups_in_opp])
@@ -119,9 +119,6 @@ class OppNode(Node):
     def invalidateEntries(self, old):
         numInv = len(old)
         self.numEntries -= numInv
-        for k in old:
-            self.counter[k] = 0  # set invlaid entry as (dead) cold
-
         # Update the dupLocations in cores
         partitions = dict()
         for (k, _) in old:
@@ -132,6 +129,10 @@ class OppNode(Node):
                 partitions[dest_id] = [k]
         for core_id in partitions:
             self.pool[core_id].dupRemoved(self.index, partitions[core_id])
+        
+        # Now really invalidate
+        for k in old:
+            self.counter[k] = 0  # set invlaid entry as (dead) cold
 
         return numInv
 
@@ -139,9 +140,6 @@ class OppNode(Node):
     def removeEntries(self, old):
         numDel = len(old)
         self.numEntries -= numDel
-        for k in old:
-            self.memcache.delete(k)
-
         # Update the dupLocations in cores
         partitions = dict()
         for (k, _) in old:
@@ -152,6 +150,10 @@ class OppNode(Node):
                 partitions[dest_id] = [k]
         for core_id in partitions:
             self.pool[core_id].dupRemoved(self.index, partitions[core_id])
+
+        # Now really delete it
+        for k in old:
+            self.memcache.delete(k)
 
         return numDel
 
@@ -347,8 +349,6 @@ class LoadBalancer(object):
                     print "Error: cannot launch new nodes."
 
     def __init__(self, numcore, duration, budget = 0.0):
-        #data.corenodes = [ ] # change to dict? map index to node
-        #data.oppnodes = [ ]
         self.numcore = numcore
         self.duration = duration
         self.budget = float(budget)
@@ -357,14 +357,17 @@ class LoadBalancer(object):
         self.rebalance_lock = False
 
         # Bidding for core node
-        self.bidcore = predict.pull_prediction(self.duration) # float
+        self.bidcore = float(predict.pull_prediction(self.duration)) # float
         
         if (self.numcore * self.bidcore > self.budget):
             print "Error: not enough budget."
-            return -1
+            sys.exit(-1)
 
         # available bids (decreasing order)
-        market =  spot.get_current_spot_price() # float
+        price_list = spot.get_current_spot_price()
+        prices = [s for (s, a) in price_list]
+        market = float(min(prices)) # float
+
         opp_budget = self.budget - self.numcore * self.bidcore
         self.bids = max_nodes_bid(self.bidcore, market, opp_budget)
  
