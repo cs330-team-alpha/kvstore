@@ -285,6 +285,7 @@ class LoadBalancer(object):
     # Use trigger ot allow Proxy initiate re-distribution of duplicates
     # Returns the opp node id we are rebalancing, or -1 if no opp node
     def rebalance(self, hot_core_node_id):
+        print "Trying rebalance:"
         self.rebalance_lock = True
         cold_opp_id = -1
         for idx in xrange(len(self.pool)):
@@ -293,6 +294,7 @@ class LoadBalancer(object):
                 # this node is under-utilized
                 cold_opp = node
                 cold_opp_id = idx
+                
 
         if cold_opp_id >= 0:
             hot_core = self.pool[hot_core_node_id]
@@ -316,6 +318,8 @@ class LoadBalancer(object):
                 self.pool[core_id].dupRemoved(cold_opp_id, partitions[core_id])
 
             hot_core.dupAdded(cold_opp_id, hot)
+            print "Rebalance successful. Moving %d KV entries from Node %d to Node %d." % (len(cold), hot_core_node_id, cold_opp_id)
+          
         self.rebalance_lock = False
         return cold_opp_id
 
@@ -324,6 +328,7 @@ class LoadBalancer(object):
         # See rebalancing can fix the problem already
         rebalanced_opp = self.rebalance(self, hot_core_node_id)
         if rebalanced_opp == -1:
+            print "Rebalance failed. Trying rescale:"
             # rebalance was not successful
             hot_core = self.pool[hot_core_node_id]
             num_elem = len(hot_core.counter.elements())
@@ -336,8 +341,11 @@ class LoadBalancer(object):
             numEntries = last_opp.numEntries
             if ((capacity - numEntries) >= len(hot)):
                 last_opp.addEntries(hotKV)
+                print "Enough space in the last node: Moving %d KV entries from Node %d to Node %d" % (len(hot), hot_core_node_id, last_id)
             else:
                 last_opp.addEntries(hotKV[:(capacity - numEntries)])
+                print "Not enough space in the last node."
+                print "Move part1: Moving %d KV entries from Node %d to Node %d" % ((capacity - numEntries), hot_core_node_id, last_id)
                 if (len(self.bids) != 0):
                     # launch the expensive bid
                     new_id = self.launch_opp(self.bids[0])
@@ -345,8 +353,9 @@ class LoadBalancer(object):
                     new_opp = self.pool[new_id]
                     new_opp.addEntries(hotKV[(capacity - numEntries):-1])
                     hot_core.dupAdded(new_opp.index, hot)
+                    print "Move part2: Moving %d KV entries from Node %d to Node %d" % ((len(hot)-(capacity - numEntries)), hot_core_node_id, new_id)
                 else:
-                    print "Error: cannot launch new nodes."
+                    print "Move part2 failed: cannot launch new nodes."
 
     def __init__(self, numcore, duration, budget = 0.0):
         self.numcore = numcore
