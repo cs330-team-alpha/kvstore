@@ -29,8 +29,8 @@ class ServerProtocol(protocol.Protocol):
             self.client.write(data)
         else:
             self.buffer = data
-        # DEBUG print INCOMING
-        # DEBUG print data
+        print INCOMING
+        print data
 
     # Proxy => Client
     def write(self, data):
