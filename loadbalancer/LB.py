@@ -264,10 +264,13 @@ class LoadBalancer(object):
         node = self.pool[core_id]
         for opp_idx in node.dupLocations:
             # delete the copy in opp
-            self.pool[opp_idx].memcache.delete(key)
+            try:
+                self.pool[opp_idx].memcache.delete(key)
+            except:
+                pass
         # Now clear the duplication list
-        del node.dupLocations[key]
-        
+        if key in node.dupLocations:
+            del node.dupLocations[key]
 
     def cmemcache_hash(self, key):
         # Use memcache-style hash to locate key in core nodes
@@ -276,8 +279,8 @@ class LoadBalancer(object):
     def get_node_id(self, key, write=False):
         core_id = self.cmemcache_hash(key)
         if write:
-            write_invalidate(core_id, key)
-        elif self.rebalance_lock:
+            self.write_invalidate(core_id, key)
+        if self.rebalance_lock:
             return core_id
         else:
             # Round-Robin
