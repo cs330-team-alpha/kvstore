@@ -260,13 +260,24 @@ class LoadBalancer(object):
         del self.pool[index]
         return index
 
+    def write_invalidate(self, core_id, key):
+        node = self.pool[core_id]
+        for opp_idx in node.dupLocations:
+            # delete the copy in opp
+            self.pool[opp_idx].memcache.delete(key)
+        # Now clear the duplication list
+        del node.dupLocations[key]
+        
+
     def cmemcache_hash(self, key):
         # Use memcache-style hash to locate key in core nodes
         return ((((binascii.crc32(key) & 0xffffffff) >> 16) & 0x7fff) or 1) % self.numcore
 
-    def get_node_id(self, key):
+    def get_node_id(self, key, write=False):
         core_id = self.cmemcache_hash(key)
-        if self.rebalance_lock:
+        if write:
+            write_invalidate(core_id, key)
+        elif self.rebalance_lock:
             return core_id
         else:
             # Round-Robin
@@ -289,8 +300,8 @@ class LoadBalancer(object):
         return self.pool[index]
 
     # Use trigger ot allow Proxy initiate re-distribution of duplicates
-    # Returns the opp node id we are rebalancing, or -1 if no opp node
     def rebalance(self, hot_core_node_id):
+        '''Returns the opp node id we are rebalancing, or -1 if no opp node'''
         print "Trying rebalance:"
         self.rebalance_lock = True
         cold_opp_id = -1

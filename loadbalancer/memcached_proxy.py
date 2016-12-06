@@ -68,11 +68,12 @@ class ServerProtocol(protocol.Protocol):
         # print INCOMING
         # print data
         query = MemcachedQuery(data)
+        isWrite = query.command in MemcachedClient._STORE_COMMANDS
         if query.key is None:
             # META/Non-key request direct to first node by default
             node_id = 0
         else:
-            node_id = self.load_balancer.get_node_id(query.key)
+            node_id = self.load_balancer.get_node_id(query.key, isWrite)
 
         # returnstring = kv_pool[nodeid].process_memcached_query(query)
 
