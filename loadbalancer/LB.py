@@ -3,6 +3,7 @@ import sys
 sys.path.insert(0, os.path.abspath('../predictor'))
 
 import collections
+import random
 import predict
 import spot
 from kv_clients import MemcachedClient
@@ -118,25 +119,26 @@ class OppNode(Node):
         return numAdd
 
     # for write-invalidation
-    def invalidateEntries(self, old, lb):
-        numInv = len(old)
-        self.numEntries -= numInv
-        # Update the dupLocations in cores
-        partitions = dict()
-        for (k, _) in old:
-            dest_id = lb.cmemcache_hash(k)
-            if dest_id in partitions:
-                partitions[dest_id].append(k)
-            else:
-                partitions[dest_id] = [k]
-        for core_id in partitions:
-            lb.pool[core_id].dupRemoved(self.index, partitions[core_id])
-        
-        # Now really invalidate
-        for k in old:
-            self.counter[k] = 0  # set invlaid entry as (dead) cold
+    
+    # def invalidateEntries(self, old, lb):
+    #     numInv = len(old)
+    #     self.numEntries -= numInv
+    #     # Update the dupLocations in cores
+    #     partitions = dict()
+    #     for (k, _) in old:
+    #         dest_id = lb.cmemcache_hash(k)
+    #         if dest_id in partitions:
+    #             partitions[dest_id].append(k)
+    #         else:
+    #             partitions[dest_id] = [k]
+    #    for core_id in partitions:
+    #         lb.pool[core_id].dupRemoved(self.index, partitions[core_id])
+    #     
+    #     # Now really invalidate
+    #     for k in old:
+    #         self.counter[k] = 0  # set invlaid entry as (dead) cold
 
-        return numInv
+    #     return numInv
 
     # old = [k1, k2, ...]
     def removeEntries(self, old, lb):
@@ -265,6 +267,7 @@ class LoadBalancer(object):
         for opp_idx in node.dupLocations:
             # delete the copy in opp
             self.pool[opp_idx].memcache.delete(key)
+            self.pool[opp_idx].numEntries -= 1
         # Now clear the duplication list
         del node.dupLocations[key]
         
@@ -300,45 +303,68 @@ class LoadBalancer(object):
     def get_node(self, index):
         return self.pool[index]
 
-    # Use trigger ot allow Proxy initiate re-distribution of duplicates
+    def lb_lock(self):
+        while True:
+            while (self.rebalance_lock == True):
+                continue # while other has the lock
+            if (self.rebalance_lock == False):
+                self.rebalance_lock = True
+                return
+
+    def lb_unlock(self):
+        self.rebalance_lock = False
+
+    # Use trigger or allow Proxy initiate re-distribution of duplicates
     def rebalance(self, hot_core_node_id):
         '''Returns the opp node id we are rebalancing, or -1 if no opp node'''
         print "Trying rebalance:"
-        self.rebalance_lock = True
+        # self.rebalance_lock = True
+        self.lb_lock() # Acquire the lock
         cold_opp_id = -1
+        cold_opps = [ ]
         for idx in xrange(len(self.pool)):
             node = self.pool[idx]
             if (isinstance(node) == OppNode and node.freq < self.low_thr):
                 # this node is under-utilized
-                cold_opp = node
                 cold_opp_id = idx
-                
+                cold_opps.append((idx, node))
 
         if cold_opp_id >= 0:
+            # There exists at least one under-utilized node
+            (cold_opp_id, cold_opp) = random.choice(cold_opps) # randomly choose one
             hot_core = self.pool[hot_core_node_id]
 
-            num_elem = len(hot_core.counter.elements())
-            # Note 10% of non-zero elem
-            hotKV = hot_core.getHotKV(num_elem / 10)
-            # Note 10% of non-zero elem
-            hot = hot_core.getHotKeys(num_elem / 10)
-            cold = cold_opp.getColdKeys(num_elem / 10)
+            num_elem = len(list(hot_core.counter.elements()))
+            num_move = num/elem # Note 10% of non-zero elem in hot node
+            hotKV = hot_core.getHotKV(num_move)
+            hot = hot_core.getHotKeys(num_move)
 
-            cold_opp.replaceEntries(cold, hotKV)
-            partitions = dict()
-            for k in cold:
-                dest_id = self.cmemcache_hash(k)
-                if dest_id in partitions:
-                    partitions[dest_id] = partitions[dest_id].append(k)
-                else:
-                    partitions[dest_id] = [k]
-            for core_id in partitions:
-                self.pool[core_id].dupRemoved(cold_opp_id, partitions[core_id])
+            # Occupy spare capacity first
+            spare = cold_opp.capacity - cold_opp.numEntries
+            if (num_move < spare):
+                cold_opp.addEntries(hotKV, self)
+            else:
+                num_replace = num_move - spare
+                cold = cold_opp.getColdKeys(num_replace)
+                cold_opp.replaceEntries(cold, hotKV[:num_replace], self)
+                partitions = dict()
+                for k in cold:
+                    dest_id = self.cmemcache_hash(k)
+                    if dest_id in partitions:
+                        partitions[dest_id] = partitions[dest_id].append(k)
+                    else:
+                        partitions[dest_id] = [k]
+                for core_id in partitions:
+                    self.pool[core_id].dupRemoved(cold_opp_id, partitions[core_id])
+                # Now fill the spare
+                cold_opp.addEntries(hotKV[num_replace:], self)
 
+            # Finish rebalancing. Notify core node.
             hot_core.dupAdded(cold_opp_id, hot)
             print "Rebalance successful. Moving %d KV entries from Node %d to Node %d." % (len(cold), hot_core_node_id, cold_opp_id)
           
-        self.rebalance_lock = False
+        # self.rebalance_lock = False
+        self.lb_unlock() # release the lock
         return cold_opp_id
 
     # Use trigger or allow Proxy initiate launch/terminate opp nodes
@@ -347,6 +373,7 @@ class LoadBalancer(object):
         # See rebalancing can fix the problem already
         # SUHAIL REMOVED: rebalanced_opp = self.rebalance(self, hot_core_node_id)
         # if rebalanced_opp == -1:
+            self.lb_lock() # Acquire the lock
             print "Rebalance failed. Trying rescale:"
             # rebalance was not successful
             hot_core = self.pool[hot_core_node_id]
@@ -367,6 +394,7 @@ class LoadBalancer(object):
                     print "Enough space in the last node: Moving %d KV entries from Node %d to Node %d" % (len(hot), hot_core_node_id, last_id)
                     print "Move part1: Moving %d KV entries from Node %d to Node %d" % ((capacity - numEntries), hot_core_node_id, last_id)
                     last_opp.addEntries(hotKV[:(capacity - numEntries)], self)
+                    self.lb_unlock() # release the lock
                     return True
             # No opportunisitic nodes or no nodes with spare capacity
             print "Not enough space in the last node."
@@ -380,10 +408,13 @@ class LoadBalancer(object):
                 new_opp.addEntries(hotKV, self)  # TODO: Check condition here
                 hot_core.dupAdded(new_opp.index, hot)
                 print "Move part2: Moving %d KV entries from Node %d to Node %d" % (len(hot), hot_core_node_id, new_id)
+                self.lb_unlock() # release the lock
                 return True
             else:
                 print "Move part2 failed: cannot launch new nodes."
+                self.lb_unlock() # release the lock
                 return False
+            self.lb_unlock() # release the lock
 
     def __init__(self, numcore, duration, budget = 0.0):
         self.numcore = numcore
