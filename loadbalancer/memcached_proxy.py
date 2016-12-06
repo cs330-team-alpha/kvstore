@@ -14,16 +14,37 @@ SERVER_ADDR = "localhost"
 
 NUM_CORE = 10
 DURATION = 3
-BUDGET = 10.0  # Dollars per hour
+BUDGET = 100.0  # Dollars per hour
 
 INCOMING = '######INCOMING########'
 OUTGOING = "#####OUTGOING######"
+
+
+MIN_RESCALE_THRESHOLD = 60
 
 # Easiest to keep this as a global variable.
 # kv_pool = []
 # Using Load Balancer to keep track of cluster now
 
 lb = LB.LoadBalancer(NUM_CORE, DURATION, budget=BUDGET)
+
+
+def do_rescale():
+    print "Polling Nodes for Rescale"
+    max_freq = 0
+    hot_node = None
+    for i in range(0, lb.numcore):
+        if lb.pool[i].freq > max_freq:
+            hot_node = i
+            max_freq = lb.pool[i].freq
+
+    if max_freq > MIN_RESCALE_THRESHOLD:
+        print "Triggering Rescale, we have node " + str(hot_node) + " with " + str(max_freq) + "operations"
+        lb.rescale(hot_node)
+        print "Resetting Frequencies"
+        # Reset Node Frequencies:
+        for i in range(0, lb.numcore):
+            lb.pool[i].freq = 0
 
 
 def printHotKeysThread(lb):
@@ -98,8 +119,8 @@ def main():
     print "Starting Memcached Proxy..."
 
     thread_list = []
-
-    thread_list.append(RepeatedTimer(10, printHotKeysThread, lb))
+    thread_list.append(RepeatedTimer(30, printHotKeysThread, lb))
+    thread_list.append(RepeatedTimer(60, do_rescale))
 
     try:
         reactor.listenTCP(LISTEN_PORT, factory)
@@ -107,7 +128,6 @@ def main():
     finally:
         for thread in thread_list:
             thread.stop()
-
 
 if __name__ == '__main__':
     main()

@@ -3,7 +3,7 @@ import urllib2
 
 def pull_prediction(duration):
     # Pulling DrAFTS's prediction for us-west-2 m3.medium instance type        
-    url = 'http://128.111.84.183/us-west-2-m3.medium.html'
+    url = 'http://128.111.84.183/us-east-1-m3.medium.html'
 
     f = urllib2.urlopen(url)
 

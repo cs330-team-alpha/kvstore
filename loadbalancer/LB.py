@@ -38,7 +38,7 @@ class Node(object):
         return self.counter.most_common(num)
 
     def getHotKV(self, num):
-        return [(k, self.memcache.get(k)) for k in self.getHotKeys(num)]
+        return [(k[0], self.memcache.get(k[0])) for k in self.getHotKeys(num)]
 
     def getColdKeys(self, num):
         return self.counter.most_common()[:-num - 1:-1]
@@ -89,7 +89,7 @@ class CoreNode(Node):
 
 class OppNode(Node):
     def __init__(self, capacity, addr, port, bid):
-        super().__init__(addr, port)
+        super(OppNode, self).__init__(addr, port)
         self.bid = bid
         self.capacity = capacity
         self.numEntries = 0 # for computing spare space we have in the opp node
@@ -271,6 +271,7 @@ class LoadBalancer(object):
             if key not in self.pool[core_id].dupLocations:
                 return core_id
             else:
+                print "Serving replica..."
                 (rr_counter, dups) = self.pool[core_id].dupLocations[key]
                 total_copies = 1 + len(dups)  # 1 for core
                 rr_counter = (rr_counter + 1) % total_copies
@@ -328,37 +329,46 @@ class LoadBalancer(object):
 
     # Use trigger or allow Proxy initiate launch/terminate opp nodes
     def rescale(self, hot_core_node_id):
+            ''' Return True on a successful rescale, False if not'''
         # See rebalancing can fix the problem already
-        rebalanced_opp = self.rebalance(self, hot_core_node_id)
-        if rebalanced_opp == -1:
+        # SUHAIL REMOVED: rebalanced_opp = self.rebalance(self, hot_core_node_id)
+        # if rebalanced_opp == -1:
             print "Rebalance failed. Trying rescale:"
             # rebalance was not successful
             hot_core = self.pool[hot_core_node_id]
-            num_elem = len(hot_core.counter.elements())
+            num_elem = len(list(hot_core.counter.elements()))
             # Note 10% of non-zero elem
             hotKV = hot_core.getHotKV(num_elem / 10)
             hot = hot_core.getHotKeys(num_elem / 10)
             last_id = max(self.pool.keys())
-            last_opp = self.pool[last_id]
-            capacity = last_opp.capacity
-            numEntries = last_opp.numEntries
-            if ((capacity - numEntries) >= len(hot)):
-                last_opp.addEntries(hotKV)
-                print "Enough space in the last node: Moving %d KV entries from Node %d to Node %d" % (len(hot), hot_core_node_id, last_id)
+            # SUHAIL FIX: Wrong assumption that opp_nodes exist
+            if len(self.pool.keys()) > self.numcore:  # Check if we have opprotunistic nodes
+                print "We have opportunistic nodes in our cluster"
+                last_opp = self.pool[last_id]
+                capacity = last_opp.capacity
+                numEntries = last_opp.numEntries
+                if ((capacity - numEntries) >= len(hot)):
+                    last_opp.addEntries(hotKV)
+                    print "Enough space in the last node: Moving %d KV entries from Node %d to Node %d" % (len(hot), hot_core_node_id, last_id)
+                    print "Move part1: Moving %d KV entries from Node %d to Node %d" % ((capacity - numEntries), hot_core_node_id, last_id)
+                    last_opp.addEntries(hotKV[:(capacity - numEntries)])
+                    return True
+            # No opportunisitic nodes or no nodes with spare capacity
+            print "Not enough space in the last node."
+            if (len(self.bids) != 0):
+                # launch the expensive bid
+                new_id = self.launch_opp(self.bids[0])
+                del self.bids[0]
+                new_opp = self.pool[new_id]
+                capacity = new_opp.capacity
+                numEntries = new_opp.numEntries
+                new_opp.addEntries(hotKV[(capacity - numEntries):-1])
+                hot_core.dupAdded(new_opp.index, hot)
+                print "Move part2: Moving %d KV entries from Node %d to Node %d" % ((len(hot)-(capacity - numEntries)), hot_core_node_id, new_id)
+                return True
             else:
-                last_opp.addEntries(hotKV[:(capacity - numEntries)])
-                print "Not enough space in the last node."
-                print "Move part1: Moving %d KV entries from Node %d to Node %d" % ((capacity - numEntries), hot_core_node_id, last_id)
-                if (len(self.bids) != 0):
-                    # launch the expensive bid
-                    new_id = self.launch_opp(self.bids[0])
-                    del self.bids[0]
-                    new_opp = self.pool[new_id]
-                    new_opp.addEntries(hotKV[(capacity - numEntries):-1])
-                    hot_core.dupAdded(new_opp.index, hot)
-                    print "Move part2: Moving %d KV entries from Node %d to Node %d" % ((len(hot)-(capacity - numEntries)), hot_core_node_id, new_id)
-                else:
-                    print "Move part2 failed: cannot launch new nodes."
+                print "Move part2 failed: cannot launch new nodes."
+                return False
 
     def __init__(self, numcore, duration, budget = 0.0):
         self.numcore = numcore

@@ -34,8 +34,7 @@ def launch_local_node(node_id):
     port = LOCAL_PORTS + node_id
     process = subprocess.Popen(memcached % ('localhost', port), shell=True)
     LOCAL_PIDS[node_id] = process.pid  # Store PID for killing in future
-    print "Launched local node at port " + str(port)
-    print LOCAL_PIDS
+    print "Launched local node at port " + str(port) + " PID: " + str(process.pid)
     return 'localhost', str(port)
 
 
