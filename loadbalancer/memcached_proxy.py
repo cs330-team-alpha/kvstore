@@ -6,6 +6,7 @@ from query import MemcachedQuery
 from kv_clients import MemcachedClient
 
 import LB  # load balancer
+from timed_threading import RepeatedTimer
 
 LISTEN_PORT = 8000
 SERVER_PORT = 11211  # Memcached default port
@@ -25,6 +26,11 @@ OUTGOING = "#####OUTGOING######"
 lb = LB.LoadBalancer(NUM_CORE, DURATION, budget=BUDGET)
 
 
+def printHotKeysThread(lb):
+    for node in lb.pool.values():
+        print "Node: " + str(node.index) + " Hot Keys: " + str(node.getHotKeys(2))
+
+
 class ServerProtocol(protocol.Protocol):
     def __init__(self):
         self.buffer = None
@@ -38,8 +44,8 @@ class ServerProtocol(protocol.Protocol):
 
     # Incoming Query
     def dataReceived(self, data):
-        print INCOMING
-        print data
+        # print INCOMING
+        # print data
         query = MemcachedQuery(data)
         if query.key is None:
             # META/Non-key request direct to first node by default
@@ -59,8 +65,7 @@ class ServerProtocol(protocol.Protocol):
         self.transport.write(returnstring)
 
         # Update node frequencies:
-        if query.command in MemcachedClient._META_COMMANDS:
-            return
+        read, write = [], []
         if query.command in MemcachedClient._STORE_COMMANDS:
             write = [query.key]
         elif query.command in MemcachedClient._GET_COMMANDS:
@@ -91,8 +96,17 @@ def main():
     # add_node(SERVER_ADDR, SERVER_PORT)
 
     print "Starting Memcached Proxy..."
-    reactor.listenTCP(LISTEN_PORT, factory)
-    reactor.run()
+
+    thread_list = []
+
+    thread_list.append(RepeatedTimer(10, printHotKeysThread, lb))
+
+    try:
+        reactor.listenTCP(LISTEN_PORT, factory)
+        reactor.run()
+    finally:
+        for thread in thread_list:
+            thread.stop()
 
 
 if __name__ == '__main__':
