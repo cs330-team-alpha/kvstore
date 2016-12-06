@@ -10,9 +10,9 @@ PROCNAME = "python.exe"
 
 # TODO: Cleanup
 
-IMAGE_ID = 'ami-4d87fc5a'
+IMAGE_ID = 'ami-34ede923'
 KEY_NAME = 'cs330'
-SECURITY_GROUP_ID = 'sg-0e5f5174'
+SECURITY_GROUP_ID = 'sg-d791d2aa'
 EXPERIMENT_DURATION = 24 * 60 * 60
 LOG_PREFIX = 'results/' + datetime.now().strftime('%Y%m%d_%H%M%S')
 
@@ -120,10 +120,10 @@ def dump_dict_csv(full_dict, csvfile):
 
 
 def launch_spot_node(bid_price):
-    bid = {'ami': 'ami-104d0507',
+    bid = {'ami': IMAGE_ID,
            'price': bid_price,
-           'sgid': 'sg-dc2124b8',   # VERIFY SGID and that port 11211 is open
-           'type': 't2.micro',
+           'sgid': SECURITY_GROUP_ID,
+           'type': 'm3.medium',
            'zone': 'us-east-1b'
            }
 
@@ -193,3 +193,12 @@ def get_node_load(cwclient, instance_id):
     load = round((utilization / 100.0), 2)
 
     return load
+
+
+def probe_cluster_load(cwclient, instance_ids, upper_threshold):
+    hot_nodes = []
+    for instance in instance_ids:
+        node_load = get_node_load(cwclient, instance_ids)
+        if node_load > upper_threshold:
+            hot_nodes.append(instance)
+    return hot_nodes

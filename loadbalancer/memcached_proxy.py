@@ -3,6 +3,7 @@
 from twisted.internet import protocol, reactor
 # from kv_clients import MemcachedClient
 from query import MemcachedQuery
+from kv_clients import MemcachedClient
 
 import LB  # load balancer
 
@@ -12,7 +13,7 @@ SERVER_ADDR = "localhost"
 
 NUM_CORE = 10
 DURATION = 3
-BUDGET = 10.0 # Dollars per hour
+BUDGET = 10.0  # Dollars per hour
 
 INCOMING = '######INCOMING########'
 OUTGOING = "#####OUTGOING######"
@@ -56,6 +57,17 @@ class ServerProtocol(protocol.Protocol):
         # print returnstring
 
         self.transport.write(returnstring)
+
+        # Update node frequencies:
+        if query.command in MemcachedClient._META_COMMANDS:
+            return
+        if query.command in MemcachedClient._STORE_COMMANDS:
+            write = [query.key]
+        elif query.command in MemcachedClient._GET_COMMANDS:
+            read = [query.key]
+
+        node = self.load_balancer.get_node(node_id)
+        node.updateFreq(read, write)
 
 
 # def add_node(address, port):
