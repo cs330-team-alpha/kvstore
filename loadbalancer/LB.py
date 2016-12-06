@@ -9,7 +9,7 @@ from kv_clients import MemcachedClient
 import binascii
 import spot_instance
 
-CAPACITY = 100 #max number of entries each opp node can store
+CAPACITY = 1000 #max number of entries each opp node can store
 
 LOW_THRESHOLD = 20
 HIGH_THRESHOLD = 80
@@ -108,7 +108,7 @@ class OppNode(Node):
         for (k, _) in new:
             dest_id = lb.cmemcache_hash(k)
             if dest_id in partitions:
-                print "Paritiion: " + str(k) + ", " + str(dest_id) + ", " + str(partitions[dest_id])
+                # DEBUG print "Paritiion: " + str(k) + ", " + str(dest_id) + ", " + str(partitions[dest_id])
                 partitions[dest_id].append(k)
             else:
                 partitions[dest_id] = [k]
@@ -273,13 +273,14 @@ class LoadBalancer(object):
             if key not in self.pool[core_id].dupLocations:
                 return core_id
             else:
-                print "Serving replica..."
+                # print "Serving replica..."
                 (rr_counter, dups) = self.pool[core_id].dupLocations[key]
                 total_copies = 1 + len(dups)  # 1 for core
                 rr_counter = (rr_counter + 1) % total_copies
                 if rr_counter == 0:
                     return core_id
                 else:
+                    #print "Serving Replica"
                     return dups[rr_counter - 1]
 
     def get_memcached_client(self, index):
