@@ -96,7 +96,8 @@ class OppNode(Node):
 
     # Assuming new entries will fit this opp node
     # new = [(k1, v1), ...]
-    def addEntries(self, new):
+    def addEntries(self, new, lb):
+        print 'Adding ' + str(len(new)) + ' entries to opportunistic node ' + str(self.index)
         numAdd = len(new)
         self.numEntries += numAdd
         for (k, v) in new:
@@ -105,30 +106,31 @@ class OppNode(Node):
         # Update the dupLocations in cores
         partitions = dict()
         for (k, _) in new:
-            dest_id = self.cmemcache_hash(k)
+            dest_id = lb.cmemcache_hash(k)
             if dest_id in partitions:
-                partitions[dest_id] = partitions[dest_id].append(k)
+                print "Paritiion: " + str(k) + ", " + str(dest_id) + ", " + str(partitions[dest_id])
+                partitions[dest_id].append(k)
             else:
                 partitions[dest_id] = [k]
         for core_id in partitions:
-            self.pool[core_id].dupAdded(self.index, partitions[core_id])
+            lb.pool[core_id].dupAdded(self.index, partitions[core_id])
 
         return numAdd
 
     # for write-invalidation
-    def invalidateEntries(self, old):
+    def invalidateEntries(self, old, lb):
         numInv = len(old)
         self.numEntries -= numInv
         # Update the dupLocations in cores
         partitions = dict()
         for (k, _) in old:
-            dest_id = self.cmemcache_hash(k)
+            dest_id = lb.cmemcache_hash(k)
             if dest_id in partitions:
-                partitions[dest_id] = partitions[dest_id].append(k)
+                partitions[dest_id].append(k)
             else:
                 partitions[dest_id] = [k]
         for core_id in partitions:
-            self.pool[core_id].dupRemoved(self.index, partitions[core_id])
+            lb.pool[core_id].dupRemoved(self.index, partitions[core_id])
         
         # Now really invalidate
         for k in old:
@@ -137,19 +139,19 @@ class OppNode(Node):
         return numInv
 
     # old = [k1, k2, ...]
-    def removeEntries(self, old):
+    def removeEntries(self, old, lb):
         numDel = len(old)
         self.numEntries -= numDel
         # Update the dupLocations in cores
         partitions = dict()
         for (k, _) in old:
-            dest_id = self.cmemcache_hash(k)
+            dest_id = lb.cmemcache_hash(k)
             if dest_id in partitions:
-                partitions[dest_id] = partitions[dest_id].append(k)
+                partitions[dest_id].append(k)
             else:
                 partitions[dest_id] = [k]
         for core_id in partitions:
-            self.pool[core_id].dupRemoved(self.index, partitions[core_id])
+            lb.pool[core_id].dupRemoved(self.index, partitions[core_id])
 
         # Now really delete it
         for k in old:
@@ -339,6 +341,7 @@ class LoadBalancer(object):
             num_elem = len(list(hot_core.counter.elements()))
             # Note 10% of non-zero elem
             hotKV = hot_core.getHotKV(num_elem / 10)
+            print "Hot Items: " + str([k for k, v in hotKV])
             hot = hot_core.getHotKeys(num_elem / 10)
             last_id = max(self.pool.keys())
             # SUHAIL FIX: Wrong assumption that opp_nodes exist
@@ -348,10 +351,10 @@ class LoadBalancer(object):
                 capacity = last_opp.capacity
                 numEntries = last_opp.numEntries
                 if ((capacity - numEntries) >= len(hot)):
-                    last_opp.addEntries(hotKV)
+                    last_opp.addEntries(hotKV, self)
                     print "Enough space in the last node: Moving %d KV entries from Node %d to Node %d" % (len(hot), hot_core_node_id, last_id)
                     print "Move part1: Moving %d KV entries from Node %d to Node %d" % ((capacity - numEntries), hot_core_node_id, last_id)
-                    last_opp.addEntries(hotKV[:(capacity - numEntries)])
+                    last_opp.addEntries(hotKV[:(capacity - numEntries)], self)
                     return True
             # No opportunisitic nodes or no nodes with spare capacity
             print "Not enough space in the last node."
@@ -362,9 +365,9 @@ class LoadBalancer(object):
                 new_opp = self.pool[new_id]
                 capacity = new_opp.capacity
                 numEntries = new_opp.numEntries
-                new_opp.addEntries(hotKV[(capacity - numEntries):-1])
+                new_opp.addEntries(hotKV, self)  # TODO: Check condition here
                 hot_core.dupAdded(new_opp.index, hot)
-                print "Move part2: Moving %d KV entries from Node %d to Node %d" % ((len(hot)-(capacity - numEntries)), hot_core_node_id, new_id)
+                print "Move part2: Moving %d KV entries from Node %d to Node %d" % (len(hot), hot_core_node_id, new_id)
                 return True
             else:
                 print "Move part2 failed: cannot launch new nodes."
