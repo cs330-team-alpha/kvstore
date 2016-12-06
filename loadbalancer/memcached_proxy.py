@@ -12,7 +12,7 @@ LISTEN_PORT = 8000
 SERVER_PORT = 11211  # Memcached default port
 SERVER_ADDR = "localhost"
 
-NUM_CORE = 10
+NUM_CORE = 1
 DURATION = 3
 BUDGET = 100.0  # Dollars per hour
 
@@ -20,7 +20,7 @@ INCOMING = '######INCOMING########'
 OUTGOING = "#####OUTGOING######"
 
 
-MIN_RESCALE_THRESHOLD = 60
+MIN_RESCALE_THRESHOLD = 100  # Ops/min
 
 # Easiest to keep this as a global variable.
 # kv_pool = []
@@ -45,6 +45,7 @@ def do_rescale():
         # Reset Node Frequencies:
         for i in range(0, lb.numcore):
             lb.pool[i].freq = 0
+            lb.pool[i].counter.clear()
 
 
 def printHotKeysThread(lb):
