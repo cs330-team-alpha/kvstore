@@ -282,6 +282,9 @@ class LoadBalancer(object):
     def get_memcached_client(self, index):
         return self.pool[index].memcache
 
+    def get_node(self, index):
+        return self.pool[index]
+
     # Use trigger ot allow Proxy initiate re-distribution of duplicates
     # Returns the opp node id we are rebalancing, or -1 if no opp node
     def rebalance(self, hot_core_node_id):
