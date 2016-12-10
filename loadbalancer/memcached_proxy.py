@@ -142,10 +142,11 @@ def main():
     print "Starting Memcached Proxy..."
 
     thread_list = []
-    thread_list.append(RepeatedTimer(30, printHotKeysThread, lb))
+    # Removed for single node latency test
+    #thread_list.append(RepeatedTimer(30, printHotKeysThread, lb))
 
-    thread_list.append(RepeatedTimer(45, do_rebalance))
-    thread_list.append(RepeatedTimer(60, do_rescale))
+    #thread_list.append(RepeatedTimer(45, do_rebalance))
+    #thread_list.append(RepeatedTimer(60, do_rescale))
 
     try:
         reactor.listenTCP(LISTEN_PORT, factory)

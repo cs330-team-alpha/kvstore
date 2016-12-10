@@ -229,9 +229,12 @@ class LoadBalancer(object):
             # Assume at this point this spot instance has been fulfilled
             # Then store spot info into LB node pool
 
-            addr, port = spot_instance.launch_local_node(i)
+            # addr, port = spot_instance.launch_local_node(i)
 
             # END SUHAIL LOCAL LAUNCH TESTING
+
+            # SUHAIL SINGLE NODE LATENCY TEST
+            addr, port = 'ec2-54-84-220-157.compute-1.amazonaws.com', 11211
 
             new_node = CoreNode(addr, port)
             idx = new_node.index
