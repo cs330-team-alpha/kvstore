@@ -20,7 +20,7 @@ INCOMING = '######INCOMING########'
 OUTGOING = "#####OUTGOING######"
 
 
-MIN_RESCALE_THRESHOLD = 100  # Ops/min
+MIN_RESCALE_THRESHOLD = 10000  # Ops/min
 MIN_REBALANCE_THRESHOLD = 100
 
 # Easiest to keep this as a global variable.
@@ -63,15 +63,16 @@ def do_rescale():
         print "Triggering Rescale, we have node " + str(hot_node) + " with " + str(max_freq) + "operations"
         lb.rescale(hot_node)
         print "Resetting Frequencies"
-        # Reset Node Frequencies:
-        for i in range(0, lb.numcore):
-            lb.pool[i].freq = 0
-            lb.pool[i].counter.clear()
+    # Reset Node Frequencies:
+    for i in range(0, lb.numcore):
+        lb.pool[i].freq = 0
+        lb.pool[i].counter.clear()
 
 
 def printHotKeysThread(lb):
     for node in lb.pool.values():
-        print "Node: " + str(node.index) + " Hot Keys: " + str(node.getHotKeys(2))
+        #print "Node: " + str(node.index) + " Hot Keys: " + str(node.getHotKeys(2))
+        print "Node: " + str(node.index) + " Load: " + str(node.freq) + " ops/minute"
 
 
 class ServerProtocol(protocol.Protocol):
@@ -143,7 +144,7 @@ def main():
 
     thread_list = []
     # Removed for single node latency test
-    #thread_list.append(RepeatedTimer(30, printHotKeysThread, lb))
+    thread_list.append(RepeatedTimer(60, printHotKeysThread, lb))
 
     #thread_list.append(RepeatedTimer(45, do_rebalance))
     #thread_list.append(RepeatedTimer(60, do_rescale))
