@@ -234,7 +234,10 @@ class LoadBalancer(object):
             # END SUHAIL LOCAL LAUNCH TESTING
 
             # SUHAIL SINGLE NODE LATENCY TEST
-            addr, port = 'ec2-54-84-220-157.compute-1.amazonaws.com', 11211
+            # addr, port = 'ec2-54-84-220-157.compute-1.amazonaws.com', 11211
+            # END SUHAIL SINGLE NODE LATENCY TEST
+
+            addr, port = spot_instance.launch_spot_node(self.bidCore)
 
             new_node = CoreNode(addr, port)
             idx = new_node.index
@@ -255,6 +258,7 @@ class LoadBalancer(object):
         addr, port = spot_instance.launch_local_node(max(self.pool.keys()) + 1)
 
         # END SUHAIL LOCAL LAUNCH TESTING
+        addr, port = spot_instance.launch_spot_node(bid)
 
         new_node = OppNode(CAPACITY, addr, port, bid)
         idx = new_node.index
@@ -376,8 +380,8 @@ class LoadBalancer(object):
     def rescale(self, hot_core_node_id):
             ''' Return True on a successful rescale, False if not'''
         # See rebalancing can fix the problem already
-        # SUHAIL REMOVED: rebalanced_opp = self.rebalance(self, hot_core_node_id)
-        # if rebalanced_opp == -1:
+        #rebalanced_opp = self.rebalance(self, hot_core_node_id)
+        #if rebalanced_opp == -1:
             self.lb_lock() # Acquire the lock
             print "Rebalance failed. Trying rescale:"
             # rebalance was not successful
