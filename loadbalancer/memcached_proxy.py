@@ -20,8 +20,10 @@ INCOMING = '######INCOMING########'
 OUTGOING = "#####OUTGOING######"
 
 
-MIN_RESCALE_THRESHOLD = 10000  # Ops/min
+MIN_RESCALE_THRESHOLD = 2000  # Ops/second
 MIN_REBALANCE_THRESHOLD = 100
+
+RESCALE_PERIOD = 300 # seconds
 
 # Easiest to keep this as a global variable.
 # kv_pool = []
@@ -59,8 +61,8 @@ def do_rescale():
             hot_node = i
             max_freq = lb.pool[i].freq
 
-    if max_freq > MIN_RESCALE_THRESHOLD:
-        print "Triggering Rescale, we have node " + str(hot_node) + " with " + str(max_freq) + "operations"
+    if max_freq / RESCALE_PERIOD > MIN_RESCALE_THRESHOLD:
+        print "Triggering Rescale, we have node " + str(hot_node) + " with " + str(max_freq/RESCALE_PERIOD) + "operations / second"
         lb.rescale(hot_node)
         print "Resetting Frequencies"
     # Reset Node Frequencies:
@@ -147,7 +149,7 @@ def main():
     thread_list.append(RepeatedTimer(60, printHotKeysThread, lb))
 
     #thread_list.append(RepeatedTimer(45, do_rebalance))
-    #thread_list.append(RepeatedTimer(60, do_rescale))
+    #thread_list.append(RepeatedTimer(RESCALE_PERIOD, do_rescale))
 
     try:
         reactor.listenTCP(LISTEN_PORT, factory)
