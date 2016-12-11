@@ -237,7 +237,7 @@ class LoadBalancer(object):
             # addr, port = 'ec2-54-84-220-157.compute-1.amazonaws.com', 11211
             # END SUHAIL SINGLE NODE LATENCY TEST
 
-            addr, port = spot_instance.launch_spot_node(self.bidCore)
+            addr, port = spot_instance.launch_spot_node(self.bidcore)
 
             new_node = CoreNode(addr, port)
             idx = new_node.index

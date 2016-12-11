@@ -120,12 +120,12 @@ def dump_dict_csv(full_dict, csvfile):
 
 def launch_spot_node(bid_price):
     bid = {'ami': IMAGE_ID,
-           'price': bid_price,
+           'price': str(bid_price),
            'sgid': SECURITY_GROUP_ID,
            'type': 'm3.medium',
            'zone': 'us-east-1b'
            }
-
+    ec2resource = boto3.resource('ec2')
     ec2client = boto3.client('ec2')
     spot_request_id = launch_spot_instance_request(ec2client, bid)
     print "Waiting for requests to propogate"
@@ -141,7 +141,7 @@ def launch_spot_node(bid_price):
         # print "Current State: ", state
         if state == 'active':
             print "Request ", spot_request_id, " launched..."
-            launched_instance_id = get_spot_instance_id(spot_request_id)
+            launched_instance_id = get_spot_instance_id(ec2client, spot_request_id)
             waiting = False
 
         # Request Failed
@@ -152,7 +152,7 @@ def launch_spot_node(bid_price):
             return None
         time.sleep(1)
 
-    instance = get_instance_by_id(launched_instance_id)
+    instance = get_instance_by_id(ec2resource, launched_instance_id)
 
     instance.wait_until_running()
 
