@@ -1,0 +1,177 @@
+[OVERALL], RunTime(ms), 8533.0
+[OVERALL], Throughput(ops/sec), 1171.9207781553966
+[TOTAL_GCS_Copy], Count, 8.0
+[TOTAL_GC_TIME_Copy], Time(ms), 43.0
+[TOTAL_GC_TIME_%_Copy], Time(%), 0.5039259346068206
+[TOTAL_GCS_MarkSweepCompact], Count, 0.0
+[TOTAL_GC_TIME_MarkSweepCompact], Time(ms), 0.0
+[TOTAL_GC_TIME_%_MarkSweepCompact], Time(%), 0.0
+[TOTAL_GCs], Count, 8.0
+[TOTAL_GC_TIME], Time(ms), 43.0
+[TOTAL_GC_TIME_%], Time(%), 0.5039259346068206
+[READ], Operations, 5033.0
+[READ], AverageLatency(us), 751.4301609378105
+[READ], MinLatency(us), 258.0
+[READ], MaxLatency(us), 45151.0
+[READ], 95thPercentileLatency(us), 1182.0
+[READ], 99thPercentileLatency(us), 12463.0
+[READ], Return=OK, 5033
+[CLEANUP], Operations, 1.0
+[CLEANUP], AverageLatency(us), 36336.0
+[CLEANUP], MinLatency(us), 36320.0
+[CLEANUP], MaxLatency(us), 36351.0
+[CLEANUP], 95thPercentileLatency(us), 36351.0
+[CLEANUP], 99thPercentileLatency(us), 36351.0
+[UPDATE], Operations, 4967.0
+[UPDATE], AverageLatency(us), 795.67807529696
+[UPDATE], MinLatency(us), 262.0
+[UPDATE], MaxLatency(us), 175615.0
+[UPDATE], 95thPercentileLatency(us), 1371.0
+[UPDATE], 99thPercentileLatency(us), 12423.0
+[UPDATE], Return=OK, 4967
+100000 operations
+[OVERALL], RunTime(ms), 41256.0
+[OVERALL], Throughput(ops/sec), 2423.889858444832
+[TOTAL_GCS_Copy], Count, 58.0
+[TOTAL_GC_TIME_Copy], Time(ms), 198.0
+[TOTAL_GC_TIME_%_Copy], Time(%), 0.4799301919720768
+[TOTAL_GCS_MarkSweepCompact], Count, 0.0
+[TOTAL_GC_TIME_MarkSweepCompact], Time(ms), 0.0
+[TOTAL_GC_TIME_%_MarkSweepCompact], Time(%), 0.0
+[TOTAL_GCs], Count, 58.0
+[TOTAL_GC_TIME], Time(ms), 198.0
+[TOTAL_GC_TIME_%], Time(%), 0.4799301919720768
+[READ], Operations, 49888.0
+[READ], AverageLatency(us), 391.41250400898014
+[READ], MinLatency(us), 238.0
+[READ], MaxLatency(us), 103359.0
+[READ], 95thPercentileLatency(us), 390.0
+[READ], 99thPercentileLatency(us), 2699.0
+[READ], Return=OK, 49888
+[CLEANUP], Operations, 1.0
+[CLEANUP], AverageLatency(us), 2633.0
+[CLEANUP], MinLatency(us), 2632.0
+[CLEANUP], MaxLatency(us), 2633.0
+[CLEANUP], 95thPercentileLatency(us), 2633.0
+[CLEANUP], 99thPercentileLatency(us), 2633.0
+[UPDATE], Operations, 50112.0
+[UPDATE], AverageLatency(us), 407.65383540868453
+[UPDATE], MinLatency(us), 244.0
+[UPDATE], MaxLatency(us), 85311.0
+[UPDATE], 95thPercentileLatency(us), 408.0
+[UPDATE], 99thPercentileLatency(us), 4199.0
+[UPDATE], Return=OK, 50112
+1000000 operations
+[OVERALL], RunTime(ms), 323476.0
+[OVERALL], Throughput(ops/sec), 3091.419456157489
+[TOTAL_GCS_Copy], Count, 542.0
+[TOTAL_GC_TIME_Copy], Time(ms), 853.0
+[TOTAL_GC_TIME_%_Copy], Time(%), 0.26369807961023384
+[TOTAL_GCS_MarkSweepCompact], Count, 0.0
+[TOTAL_GC_TIME_MarkSweepCompact], Time(ms), 0.0
+[TOTAL_GC_TIME_%_MarkSweepCompact], Time(%), 0.0
+[TOTAL_GCs], Count, 542.0
+[TOTAL_GC_TIME], Time(ms), 853.0
+[TOTAL_GC_TIME_%], Time(%), 0.26369807961023384
+[READ], Operations, 500211.0
+[READ], AverageLatency(us), 317.57475345404237
+[READ], MinLatency(us), 232.0
+[READ], MaxLatency(us), 41055.0
+[READ], 95thPercentileLatency(us), 357.0
+[READ], 99thPercentileLatency(us), 1173.0
+[READ], Return=OK, 500211
+[CLEANUP], Operations, 1.0
+[CLEANUP], AverageLatency(us), 3635.0
+[CLEANUP], MinLatency(us), 3634.0
+[CLEANUP], MaxLatency(us), 3635.0
+[CLEANUP], 95thPercentileLatency(us), 3635.0
+[CLEANUP], 99thPercentileLatency(us), 3635.0
+[UPDATE], Operations, 499789.0
+[UPDATE], AverageLatency(us), 322.500561236842
+[UPDATE], MinLatency(us), 237.0
+[UPDATE], MaxLatency(us), 170495.0
+[UPDATE], 95thPercentileLatency(us), 363.0
+[UPDATE], 99thPercentileLatency(us), 1176.0
+[UPDATE], Return=OK, 499789
+1000000 operations, 10 threads
+Usage: java com.yahoo.ycsb.Client [options]
+Options:
+  -threads n: execute using n threads (default: 1) - can also be specified as the 
+        "threadcount" property using -p
+  -target n: attempt to do n operations per second (default: unlimited) - can also
+       be specified as the "target" property using -p
+  -load:  run the loading phase of the workload
+  -t:  run the transactions phase of the workload (default)
+  -db dbname: specify the name of the DB to use (default: com.yahoo.ycsb.BasicDB) - 
+        can also be specified as the "db" property using -p
+  -P propertyfile: load properties from the given file. Multiple files can
+           be specified, and will be processed in the order specified
+  -p name=value:  specify a property to be passed to the DB and workloads;
+          multiple properties can be specified, and override any
+          values in the propertyfile
+  -s:  show status during run (default: no status)
+  -l label:  use label for status (e.g. to label one experiment out of a whole batch)
+
+Required properties:
+  workload: the name of the workload class to use (e.g. com.yahoo.ycsb.workloads.CoreWorkload)
+
+To run the transaction phase from multiple servers, start a separate client on each.
+To run the load phase from multiple servers, start a separate client on each; additionally,
+use the "insertcount" and "insertstart" properties to divide up the records to be inserted
+Unknown option --threads=10
+Usage: java com.yahoo.ycsb.Client [options]
+Options:
+  -threads n: execute using n threads (default: 1) - can also be specified as the 
+        "threadcount" property using -p
+  -target n: attempt to do n operations per second (default: unlimited) - can also
+       be specified as the "target" property using -p
+  -load:  run the loading phase of the workload
+  -t:  run the transactions phase of the workload (default)
+  -db dbname: specify the name of the DB to use (default: com.yahoo.ycsb.BasicDB) - 
+        can also be specified as the "db" property using -p
+  -P propertyfile: load properties from the given file. Multiple files can
+           be specified, and will be processed in the order specified
+  -p name=value:  specify a property to be passed to the DB and workloads;
+          multiple properties can be specified, and override any
+          values in the propertyfile
+  -s:  show status during run (default: no status)
+  -l label:  use label for status (e.g. to label one experiment out of a whole batch)
+
+Required properties:
+  workload: the name of the workload class to use (e.g. com.yahoo.ycsb.workloads.CoreWorkload)
+
+To run the transaction phase from multiple servers, start a separate client on each.
+To run the load phase from multiple servers, start a separate client on each; additionally,
+use the "insertcount" and "insertstart" properties to divide up the records to be inserted
+Unknown option --threads
+[OVERALL], RunTime(ms), 205907.0
+[OVERALL], Throughput(ops/sec), 4856.561457356962
+[TOTAL_GCS_Copy], Count, 591.0
+[TOTAL_GC_TIME_Copy], Time(ms), 1973.0
+[TOTAL_GC_TIME_%_Copy], Time(%), 0.9581995755365287
+[TOTAL_GCS_MarkSweepCompact], Count, 0.0
+[TOTAL_GC_TIME_MarkSweepCompact], Time(ms), 0.0
+[TOTAL_GC_TIME_%_MarkSweepCompact], Time(%), 0.0
+[TOTAL_GCs], Count, 591.0
+[TOTAL_GC_TIME], Time(ms), 1973.0
+[TOTAL_GC_TIME_%], Time(%), 0.9581995755365287
+[READ], Operations, 500567.0
+[READ], AverageLatency(us), 1991.9994286479132
+[READ], MinLatency(us), 225.0
+[READ], MaxLatency(us), 284927.0
+[READ], 95thPercentileLatency(us), 8743.0
+[READ], 99thPercentileLatency(us), 24639.0
+[READ], Return=OK, 500567
+[CLEANUP], Operations, 10.0
+[CLEANUP], AverageLatency(us), 35126.6
+[CLEANUP], MinLatency(us), 621.0
+[CLEANUP], MaxLatency(us), 106879.0
+[CLEANUP], 95thPercentileLatency(us), 106879.0
+[CLEANUP], 99thPercentileLatency(us), 106879.0
+[UPDATE], Operations, 499433.0
+[UPDATE], AverageLatency(us), 1973.8433683797425
+[UPDATE], MinLatency(us), 230.0
+[UPDATE], MaxLatency(us), 300287.0
+[UPDATE], 95thPercentileLatency(us), 8751.0
+[UPDATE], 99thPercentileLatency(us), 22671.0
+[UPDATE], Return=OK, 499433
