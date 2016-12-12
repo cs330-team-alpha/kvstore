@@ -20,7 +20,7 @@ INCOMING = '######INCOMING########'
 OUTGOING = "#####OUTGOING######"
 
 
-MIN_RESCALE_THRESHOLD = 13000  # Ops/period
+MIN_RESCALE_THRESHOLD = 40  # Ops/period
 MIN_REBALANCE_THRESHOLD = 100
 
 RESCALE_PERIOD = 300 # seconds
@@ -149,7 +149,7 @@ def main():
     thread_list.append(RepeatedTimer(60, printHotKeysThread, lb))
 
     #thread_list.append(RepeatedTimer(45, do_rebalance))
-    #thread_list.append(RepeatedTimer(RESCALE_PERIOD, do_rescale))
+    thread_list.append(RepeatedTimer(RESCALE_PERIOD, do_rescale))
 
     try:
         reactor.listenTCP(LISTEN_PORT, factory)

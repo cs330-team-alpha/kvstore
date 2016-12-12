@@ -160,7 +160,7 @@ def launch_spot_node(bid_price):
     instance.load()
 
     # TODO: Ping and verify running memcached instance
-    time.sleep(30)
+    time.sleep(60)
 
     return instance.public_dns_name, DEFAULT_MEMCACHED_PORT
 
