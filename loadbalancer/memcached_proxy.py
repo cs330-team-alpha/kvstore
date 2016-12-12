@@ -148,7 +148,7 @@ def main():
     # Removed for single node latency test
     thread_list.append(RepeatedTimer(60, printHotKeysThread, lb))
 
-    #thread_list.append(RepeatedTimer(45, do_rebalance))
+    thread_list.append(RepeatedTimer(60, do_rebalance))
     thread_list.append(RepeatedTimer(RESCALE_PERIOD, do_rescale))
 
     try:

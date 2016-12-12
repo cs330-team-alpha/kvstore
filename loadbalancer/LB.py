@@ -255,7 +255,7 @@ class LoadBalancer(object):
         # Assume at this point this spot instance has been fulfilled
         # Then store spot info into LB node pool
 
-        addr, port = spot_instance.launch_local_node(max(self.pool.keys()) + 1)
+        #addr, port = spot_instance.launch_local_node(max(self.pool.keys()) + 1)
 
         # END SUHAIL LOCAL LAUNCH TESTING
         addr, port = spot_instance.launch_spot_node(bid)
